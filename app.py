@@ -57,55 +57,52 @@ if st.button("Analyze"):
             if not chosen_reference_db:
                 st.error(f"Referensi '{selected_reference_name}' tidak ditemukan di database.")
                 st.stop()
+            uploaded_file.seek(0)
+            with io.TextIOWrapper(uploaded_file, encoding="utf-8-sig") as fasta_textio:
+                for rec in SeqIO.parse(fasta_textio, "fasta"):
+                    if rec.id in sample_ids_seen:
+                        continue
+                    sample_ids_seen.add(rec.id)
+                    samp = db.query(Sample).filter_by(sample_id=rec.id).first()
+                    if not samp:
+                        samp = Sample(sample_id=rec.id, description=rec.description or "", sequence=str(rec.seq) )
+                        db.add(samp)
+                        db.commit()
+                        db.refresh(samp)
+                    query_prot = translate_if_nucleotide(rec)
+                    ref_prot = chosen_reference_db.sequence
 
-            fasta_textio = io.TextIOWrapper(uploaded_file, encoding="utf-8")
-            for rec in SeqIO.parse(fasta_textio, "fasta"):
-                if rec.id in sample_ids_seen:
-                    continue
-                sample_ids_seen.add(rec.id)
-
-                samp = db.query(Sample).filter_by(sample_id=rec.id).first()
-                if not samp:
-                    samp = Sample(sample_id=rec.id, description=rec.description or "", sequence=str(rec.seq) )
-                    db.add(samp)
-                    db.commit()
-                    db.refresh(samp)
-
-                query_prot = translate_if_nucleotide(rec)
-                ref_prot = chosen_reference_db.sequence
-                
-                muts = detect_mutations(
-                    ref_prot,
-                    query_prot,
-                    mode,
-                    method=alignment_method_choice,
-                    mutation_rules=mutation_rules
-                )
-                
-                for m in muts:
-                    m["SampleID"] = rec.id
-                    m["Reference"] = chosen_reference_db.name
-                    db_mut = Mutation(
-                        sample_id=samp.id,
-                        reference_id=chosen_reference_db.id,
-                        position=m.get("Position", 0),
-                        mutation=m.get("Mutation", ""),
-                        drug_class=m.get("DrugClass", "unknown"),
-                        interpretation=m.get("Interpretation", "-")
+                    muts = detect_mutations(
+                        ref_prot,
+                        query_prot,
+                        mode,
+                        method=alignment_method_choice,
+                        mutation_rules=mutation_rules
                     )
-                    db.add(db_mut)
-                all_muts.extend(muts)
+                    for m in muts:
+                        m["SampleID"] = rec.id
+                        m["Reference"] = chosen_reference_db.name
+                        db_mut = Mutation(
+                            sample_id=samp.id,
+                            reference_id=chosen_reference_db.id,
+                            position=m.get("Position", 0),
+                            mutation=m.get("Mutation", ""),
+                            drug_class=m.get("DrugClass", "unknown"),
+                            interpretation=m.get("Interpretation", "-")
+                        )
+                        db.add(db_mut)
+                    all_muts.extend(muts)
 
-            db.commit()
+                db.commit()
 
-            if all_muts:
-                df = pd.DataFrame(all_muts)
-                st.success(f"Ditemukan {len(all_muts)} mutasi pada {len(sample_ids_seen)} sampel terhadap referensi '{selected_reference_name}' menggunakan metode '{alignment_method_choice}'.")
-                st.dataframe(df)
-                st.download_button("Download CSV", to_csv(all_muts), f"mutations_{selected_reference_name}_{alignment_method_choice}.csv", key="csv_download")
-                st.download_button("Download PDF", to_pdf(all_muts), f"mutations_{selected_reference_name}_{alignment_method_choice}.pdf", key="pdf_download")
-            else:
-                st.info(f"Tidak ada mutasi resistensi terdeteksi pada seluruh sampel terhadap referensi '{selected_reference_name}' menggunakan metode '{alignment_method_choice}'.")
+                if all_muts:
+                    df = pd.DataFrame(all_muts)
+                    st.success(f"Ditemukan {len(all_muts)} mutasi pada {len(sample_ids_seen)} sampel terhadap referensi '{selected_reference_name}' menggunakan metode '{alignment_method_choice}'.")
+                    st.dataframe(df)
+                    st.download_button("Download CSV", to_csv(all_muts), f"mutations_{selected_reference_name}_{alignment_method_choice}.csv", key="csv_download")
+                    st.download_button("Download PDF", to_pdf(all_muts), f"mutations_{selected_reference_name}_{alignment_method_choice}.pdf", key="pdf_download")
+                else:
+                    st.info(f"Tidak ada mutasi resistensi terdeteksi pada seluruh sampel terhadap referensi '{selected_reference_name}' menggunakan metode '{alignment_method_choice}'.")
 
         except Exception as e:
             st.error(f"Terjadi error saat analisis: {str(e)}")

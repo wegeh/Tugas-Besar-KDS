@@ -18,19 +18,18 @@ def align_sequences(ref: str, query: str, mode: str = "global", method: str = "p
         matrix_parasail = parasail.blosum62 
 
         if mode == "global":
-            aln = parasail.nw_trace_striped_16(query, ref, gap_open_parasail, gap_extend_parasail, matrix_parasail)
+            result = parasail.nw_trace_striped_16(query, ref, gap_open_parasail, gap_extend_parasail, matrix_parasail)
         elif mode == "local":
-            aln = parasail.sw_trace_striped_16(query, ref, gap_open_parasail, gap_extend_parasail, matrix_parasail)
+            result = parasail.sw_trace_striped_16(query, ref, gap_open_parasail, gap_extend_parasail, matrix_parasail)
         else:
             raise ValueError(f"Mode alignment tidak didukung: {mode} untuk parasail. Pilih 'global' atau 'local'.")
         
-        if aln.traceback is None:
-            if mode == "global":
-                return (ref + '-' * len(query), query + '-' * len(ref))
-            else:
-                return ("", "")
-
-        return str(aln.traceback.reference), str(aln.traceback.query)
+        traceback = result.traceback
+        
+        aligned_query = traceback.query
+        aligned_ref = traceback.ref
+        
+        return aligned_ref, aligned_query
 
     elif method == "biopython":
         try:
