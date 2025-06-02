@@ -1,6 +1,7 @@
 import streamlit as st
 from Bio import SeqIO
 import pandas as pd
+import io
 from translate import translate_if_nucleotide
 from detect import detect_mutations, get_mutation_rules
 from report import to_csv, to_pdf
@@ -57,7 +58,8 @@ if st.button("Analyze"):
                 st.error(f"Referensi '{selected_reference_name}' tidak ditemukan di database.")
                 st.stop()
 
-            for rec in SeqIO.parse(uploaded_file, "fasta"):
+            fasta_textio = io.TextIOWrapper(uploaded_file, encoding="utf-8")
+            for rec in SeqIO.parse(fasta_textio, "fasta"):
                 if rec.id in sample_ids_seen:
                     continue
                 sample_ids_seen.add(rec.id)
