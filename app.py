@@ -175,37 +175,42 @@ if st.button("Analyze"):
                         "SampleID", "Reference", "Position", "Mutation", "DrugClass",
                         "Interpretasi Lengkap"
                     ]
+                    st.session_state["results"] = df.to_dict("records")
+                    st.session_state["df_display"] = df[col_order]
                     st.success(
                         f"Ditemukan {len(all_muts)} mutasi pada {len(sample_ids_seen)} sampel "
                         f"terhadap referensi '{selected_reference_name}' menggunakan metode '{alignment_method_choice}'."
                     )
-                    st.dataframe(df[col_order])
-
-                    # 4) Tombol download CSV / PDF tetap menggunakan `all_muts`, 
-                    #    tetapi kalau mau, Anda bisa menyertakan kolom "Interpretasi Lengkap" di file-nya.
-                    col1, col2, col3, col4, col5 = st.columns(5)
-                    with col1:
-                        st.download_button(
-                            "Download CSV",
-                            to_csv(df.to_dict("records")),  # convert DataFrame ke list of dict
-                            f"mutations_{selected_reference_name}_{alignment_method_choice}.csv",
-                            key="csv_download"
-                        )
-                    with col2:
-                        st.download_button(
-                            "Download PDF",
-                            to_pdf(df.to_dict("records")),
-                            f"mutations_{selected_reference_name}_{alignment_method_choice}.pdf",
-                            key="pdf_download"
-                        )
                 else:
                     st.info(
                         f"Tidak ada mutasi resistensi terdeteksi pada seluruh sampel terhadap referensi "
                         f"'{selected_reference_name}' menggunakan metode '{alignment_method_choice}'."
                     )
+                    if "results" in st.session_state:
+                        del st.session_state["results"]
+                        del st.session_state["df_display"]
 
         except Exception as e:
             st.error(f"Terjadi error saat analisis: {str(e)}")
         finally:
             if db_session:
                 db_session.close()
+
+if "results" in st.session_state:
+    st.dataframe(st.session_state["df_display"])
+
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        st.download_button(
+            "Download CSV",
+            to_csv(st.session_state["results"]),
+            f"mutations_{selected_reference_name}_{alignment_method_choice}.csv",
+            key="csv_download"
+        )
+    with col2:
+        st.download_button(
+            "Download PDF",
+            to_pdf(st.session_state["results"]),
+            f"mutations_{selected_reference_name}_{alignment_method_choice}.pdf",
+            key="pdf_download"
+        )
