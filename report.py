@@ -7,15 +7,18 @@ def to_csv(muts: list[dict]) -> bytes:
 
 def to_pdf(muts: list[dict]) -> io.BytesIO:
     """
-    Buat PDF dengan format per-entry seperti:
+    Buat PDF dengan format per‐entry seperti:
 
     Position    : ...
     Mutation    : ...
     Drug Class  : ...
-    Interpretasi: ...
+    Interpretasi:
+        <poin pertama>
+        <poin kedua>
+        ...
     Sample ID   : ...
     Reference   : ...
-    
+
     (Kosongkan satu baris, lalu entry berikutnya)
     """
     buf = io.BytesIO()
@@ -27,30 +30,34 @@ def to_pdf(muts: list[dict]) -> io.BytesIO:
         text_object.textLine("Tidak ada mutasi.")
     else:
         for idx, m in enumerate(muts):
-            # Ambil masing‐masing field, dengan fallback ke "-" jika kosong atau None
             posisi = m.get("Position", "")
             mutasi = m.get("Mutation", "")
             kelas_obat = m.get("DrugClass", "")
             
-            # Ambil interpretasi lengkap jika ada, jika tidak ambil Interpretation
-            interpretasi = m.get("Interpretasi Lengkap", m.get("Interpretation", "-"))
-            if not interpretasi:
-                interpretasi = "-"
+            raw_interpretasi = m.get("Interpretasi Lengkap", m.get("Interpretation", "-")) or "-"
+            # Split per titik koma, lalu strip spasi
+            interpretasi_parts = [p.strip() for p in raw_interpretasi.split(";") if p.strip()]
             
             sample_id = m.get("SampleID", "-")
             reference = m.get("Reference", "-")
             
-            # Tulis satu baris per field
+            # Tulis field standard:
             text_object.textLine(f"Position    : {posisi}")
             text_object.textLine(f"Mutation    : {mutasi}")
             text_object.textLine(f"Drug Class  : {kelas_obat}")
-            text_object.textLine(f"Interpretasi: {interpretasi}")
+            
+            # Tulis interpretasi per‐baris:
+            text_object.textLine("Interpretasi:")
+            for part in interpretasi_parts:
+                text_object.textLine(f"    {part}")
+            
+            # Lanjutkan dengan Sample ID dan Reference
             text_object.textLine(f"Sample ID   : {sample_id}")
             text_object.textLine(f"Reference   : {reference}")
             
-            # Jika masih ada entry berikutnya, beri satu baris kosong sebagai pemisah
+            # Baris kosong pemisah, kecuali ini entry terakhir
             if idx < len(muts) - 1:
-                text_object.textLine("")  # baris kosong
+                text_object.textLine("")
 
     c.drawText(text_object)
     c.showPage()
